@@ -24,7 +24,7 @@
       "package": "com.vikash_4ever.EstateIn",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyAMIjVg9tH9df9nivBUkIUjKxEnNp7YQIg"
+          "apiKey": "YOUR_API_KEY_HERE"
         }
       },
       "androidStatusBar": {
