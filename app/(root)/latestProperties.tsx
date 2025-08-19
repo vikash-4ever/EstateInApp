@@ -3,10 +3,10 @@ import NoResults from "@/components/NoResults";
 import icons from "@/constants/icons";
 import { getProperties } from "@/lib/appwrite";
 import { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, BackHandler } from "react-native";
 import { router } from "expo-router";
 import { useGlobalContext } from "@/lib/global-provider";
+import NotificationIcon from "@/components/NotificationIcon";
 
 export default function LatestPropertiesScreen() {
   const { user } = useGlobalContext();
@@ -19,8 +19,8 @@ export default function LatestPropertiesScreen() {
   const fetchProperties = async (page: number) => {
     try {
       setLoading(true);
-      
-      const batchSize = 6;
+
+      const batchSize = 20;
       const offset = (page - 1) * batchSize;
       const result = await getProperties({
         filter: "",
@@ -42,6 +42,21 @@ export default function LatestPropertiesScreen() {
     fetchProperties(page);
   }, [page]);
 
+  const handleBack = () => {
+    if (page > 1) {
+      setPage((prev) => prev - 1);
+    } else {
+      router.back(); // same as top button
+    }
+    return true; // prevent default exit
+  };
+
+  // Handle hardware back button
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", handleBack);
+    return () => backHandler.remove();
+  }, [page]);
+
   const handleNextPage = () => {
     if (hasNextPage) {
       setPage((prev) => prev + 1); // Go to the next page
@@ -53,7 +68,20 @@ export default function LatestPropertiesScreen() {
   };
 
   return (
-    <SafeAreaView className="bg-white flex-1">
+    <View className="bg-white flex-1 gap-2">
+      <View className="flex flex-row px-6 items-center justify-between mt-5">
+        <TouchableOpacity
+          onPress={handleBack}
+          className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
+        >
+          <Image source={icons.backArrow} className="size-5" />
+        </TouchableOpacity>
+        <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
+          Latest Properties
+        </Text>
+        <NotificationIcon />
+      </View>
+
       <FlatList
         data={properties}
         renderItem={({ item }) => {
@@ -77,41 +105,19 @@ export default function LatestPropertiesScreen() {
             <NoResults />
           )
         }
-        ListHeaderComponent={
-          <View className="px-5">
-            <View className="flex flex-row items-center justify-between mt-5">
-            <TouchableOpacity
-                onPress={() => {
-                    if (page > 1) {
-                    setPage(prev => prev - 1);
-                    } else {
-                    router.push('/');
-                    }
-                }}
-                className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
-            >
-                <Image source={icons.backArrow} className="size-5" />
-            </TouchableOpacity>
-              <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
-                Latest Properties
-              </Text>
-              <TouchableOpacity>
-                <Image source={icons.bell} className="w-6 h-6" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        }
+
         ListFooterComponent={
-            hasNextPage && !loading ? (
-              <TouchableOpacity
-                onPress={handleNextPage}
-                className="mt-5 bg-primary-300 py-2 rounded-lg mx-5"
-              >
-                <Text className="text-center text-white font-rubik-semibold">See more Properties</Text>
-              </TouchableOpacity>
-            ) : null
-          }
+          hasNextPage && !loading ? (
+            <TouchableOpacity
+              onPress={handleNextPage}
+              className="mt-5 bg-primary-300 py-2 rounded-lg mx-5"
+            >
+              <Text className="text-center text-white font-rubik-semibold">See more Properties</Text>
+            </TouchableOpacity>
+          ) : null
+        }
       />
-    </SafeAreaView>
+
+    </View>
   );
 }

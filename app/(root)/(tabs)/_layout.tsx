@@ -4,9 +4,9 @@ import { Tabs } from "expo-router";
 import icons from '@/constants/icons';
 
 const TabIcon = ({ focused, icon, title} : {focused: boolean; icon: any; title: string}) => (
-    <View className="flex-1 mt-3 flex flex-col items-center">
-        <Image source={icon} tintColor={focused ? '#dfb6b2' : '#666876'} resizeMode="contain" className="size-6"/>
-        <Text className={`${focused ? 'text-primary-300 font-rubik-medium' : 'text-black-200 font-rubik'} text-xs w-full text-center mt-1`}>
+    <View className="flex-1 mt-1 flex flex-col items-center">
+        <Image source={icon} tintColor={focused ? '#000000' : '#c8c8ccff'} resizeMode="contain" className="size-6"/>
+        <Text className={`${focused ? 'text-black font-rubik-medium' : 'text-[#c8c8ccff] font-rubik'} text-xs w-full text-center mt-1`}>
             {title}
         </Text>
     </View>
@@ -20,10 +20,11 @@ const TabsLayout = () => {
                 tabBarStyle: {
                     backgroundColor: 'white',
                     position: 'absolute',
-                    borderTopColor: '#dfb6b2',
+                    borderTopColor: 'primary-200',
                     borderTopWidth: 1,
-                    minHeight: 70,
-                }
+                    minHeight: 56,
+                },
+                animation: "shift",
             }}
         >
             <Tabs.Screen

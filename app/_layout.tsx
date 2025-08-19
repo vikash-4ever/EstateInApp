@@ -9,15 +9,6 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { View, StyleSheet } from "react-native";
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 
-
-Audio.setAudioModeAsync({
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: false,
-  shouldDuckAndroid: false,
-  interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-}).catch(() => {});
-
 export default function RootLayout() {
   const [fontLoaded] = useFonts({
     "Rubik-Bold": require('../assets/fonts/Rubik-Bold.ttf'),
@@ -28,6 +19,16 @@ export default function RootLayout() {
     "Rubik-SemiBold": require('../assets/fonts/Rubik-SemiBold.ttf'),
   });
 
+   useEffect(() => {
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: false,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (fontLoaded) SplashScreen.hideAsync();
   }, [fontLoaded]);
@@ -37,7 +38,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <GlobalProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="light" backgroundColor="#000000" translucent={false} />
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaView>
@@ -49,6 +50,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: 'black',
   },
 });

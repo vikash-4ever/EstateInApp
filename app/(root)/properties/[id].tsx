@@ -8,7 +8,6 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
-  BackHandler,
   Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -20,7 +19,9 @@ import { facilities } from "@/constants/data";
 import { useAppwrite } from "@/lib/useAppwrite";
 import {
   addToFavorites,
+  deleteBookingRequest,
   deleteProperty,
+  getBookingRequestForProperty,
   getFavorites,
   getOrCreateChat,
   getPropertyById,
@@ -39,6 +40,9 @@ const Property = () => {
     fn: getPropertyById,
     params: { id: id! },
   });
+
+  const [existingRequest, setExistingRequest] = useState<any>(null);
+  const [requestLoading, setRequestLoading] = useState(false);
 
   const details = property?.details ? JSON.parse(property.details) : {};
   const meta = property?.meta ? JSON.parse(property.meta) : {};
@@ -84,17 +88,14 @@ const Property = () => {
   }, [user, property?.$id]);
 
   useEffect(() => {
-    const backAction = () => {
-      if (showImageViewer) {
-        setShowImageViewer(false);
-        return true;
+    const checkRequest = async () => {
+      if (property?.$id && uId?.$id) {
+        const req = await getBookingRequestForProperty(property.$id, uId.$id);
+        setExistingRequest(req);
       }
-      return false;
     };
-  
-    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
-    return () => backHandler.remove();
-  }, [showImageViewer]);
+    checkRequest();
+  }, [property?.$id, uId?.$id]);
 
   const facilityImages: Record<string, any> = {
     "WiFi": require('@/assets/icons/wifi.png'),
@@ -122,19 +123,57 @@ const Property = () => {
     }
   };
 
-  const handleBookingRequest = async () => {
-    if (!property || !uId) return;
+  const handlePropertyUpdate = () => {
+    Alert.alert("Property Update functionality is not available till now.")
+  }
+
+  const handleBookingButtonPress = async () => {
+  if (!property || !uId) return;
+
+  if (existingRequest) {
+    // Delete request
+    Alert.alert(
+      "Cancel Booking Request",
+      "Are you sure you want to cancel this request?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setRequestLoading(true);
+              await deleteBookingRequest(existingRequest.$id);
+              setExistingRequest(null);
+              Alert.alert("Request cancelled");
+            } catch (err) {
+              Alert.alert("Failed to cancel request");
+            } finally {
+              setRequestLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  } else {
+    // Send new request
     try {
-      await sendBookingRequest({
+      setRequestLoading(true);
+      const newReq = await sendBookingRequest({
         propertyId: property.$id,
-        senderProfileId: uId!.$id,
+        senderProfileId: uId.$id,
         receiverProfileId: property.userProfile.$id,
       });
+      setExistingRequest(newReq);
       Alert.alert("Booking request sent!");
     } catch (error) {
       Alert.alert("Failed to send request.");
+    } finally {
+      setRequestLoading(false);
     }
-  };
+  }
+};
+
 
   const handleDeletePost = () => {
     Alert.alert(
@@ -251,20 +290,12 @@ const Property = () => {
               <View className="flex flex-row items-center gap-3">
                 <TouchableOpacity onPress={handleFavoritePress}>
                   <Image
-                    source={isFavorite ? icons.heartfilled : icons.blackheart}
+                    source={isFavorite ? icons.heartfilled : icons.heart}
+                    tintColor={isFavorite ? 'red' : 'black'}
                     className="size-7"
                   />
                 </TouchableOpacity>
 
-                {property?.userProfile?.$id === uId?.$id ? (
-                  <TouchableOpacity onPress={handleDeletePost}>
-                    <Image source={icons.trash} className="size-7" />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity onPress={handleChatPress}>
-                    <Image source={icons.send} className="size-7" />
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
           </View>
@@ -291,21 +322,21 @@ const Property = () => {
           {/* Property Specs */}
           <View className="flex-row items-center mt-5">
             <View className="bg-primary-100 rounded-full size-10 items-center justify-center">
-              <Image source={icons.bed} className="size-4" tintColor={'#dfb6b2'}/>
+              <Image source={icons.bed} className="size-4" tintColor={'black'}/>
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
               {details?.bedrooms} Beds
             </Text>
 
             <View className="bg-primary-100 rounded-full size-10 ml-7 items-center justify-center">
-              <Image source={icons.bath} className="size-4" tintColor={'#dfb6b2'}/>
+              <Image source={icons.bath} className="size-4" tintColor={'black'}/>
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
               {details?.bathrooms} Baths
             </Text>
 
             <View className="bg-primary-100 rounded-full size-10 ml-7 items-center justify-center">
-              <Image source={icons.area} className="size-4" tintColor={'#dfb6b2'}/>
+              <Image source={icons.area} className="size-4" tintColor={'black'}/>
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
               {details?.area} sqft
@@ -323,7 +354,7 @@ const Property = () => {
                       source={facilityImages[facility]}
                       className="w-4 h-4"
                       resizeMode="contain"
-                      tintColor={'#dfb6b2'}
+                      tintColor={'black'}
                     />
                     <Text className="text-sm text-black-300 font-rubik-medium">
                       {facility}
@@ -364,8 +395,12 @@ const Property = () => {
               </View>
 
               <View className="flex-row gap-3">
-                <Image source={icons.chat} className="size-7" tintColor="#dfb6b2" />
-                <Image source={icons.phone} className="size-7" tintColor="#dfb6b2" />
+                <TouchableOpacity onPress={handleChatPress}>
+                    <Image source={icons.phone} tintColor={"black"} className="size-7" />
+                  </TouchableOpacity>
+                <TouchableOpacity onPress={handleChatPress}>
+                  <Image source={icons.send} tintColor={"black"} className="size-7" />
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -402,7 +437,7 @@ const Property = () => {
                   showsMyLocationButton={true}
                   zoomEnabled
                   scrollEnabled
-                  pitchEnabled={false}
+                  pitchEnabled={true}
                   rotateEnabled={true}
                 >
                   <Marker
@@ -467,9 +502,66 @@ const Property = () => {
             </Text>
           </View>
 
-          <TouchableOpacity onPress={handleBookingRequest} className="flex-1 bg-primary-300 py-3 rounded-full items-center justify-center shadow-md shadow-zinc-400">
-            <Text className="text-white text-lg font-rubik-bold">Request for Booking</Text>
-          </TouchableOpacity>
+          {property?.userProfile?.$id === uId?.$id ? (
+            // 👉 Owner Footer (Edit + Requests)
+            <View className="flex-row gap-5">
+              <TouchableOpacity
+                onPress={handlePropertyUpdate}
+                className="bg-primary-300 p-3 rounded-full items-center justify-center shadow-md shadow-zinc-400"
+              >
+                <Image source={icons.edit} className="size-6" tintColor="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/bookingRequests",
+                    params: { tab: "received", propertyId: property!.$id },
+                  })
+                }
+                className="bg-primary-300 p-3 rounded-full items-center justify-center shadow-md shadow-zinc-400"
+              >
+                <Image source={icons.calendar} className="size-6" tintColor="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleDeletePost}
+                className="bg-red-500 p-3 rounded-full items-center justify-center shadow-md shadow-zinc-400"
+              >
+                <Image source={icons.trash} className="size-6" tintColor="white" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // 👉 Buyer Footer (depends on status)
+            <TouchableOpacity
+              onPress={handleBookingButtonPress}
+              disabled={requestLoading || (existingRequest && existingRequest.status !== "pending")}
+              className={`flex-1 py-3 rounded-full items-center justify-center shadow-md shadow-zinc-400 ${
+                existingRequest?.status === "pending"
+                  ? "bg-gray-400"
+                  : existingRequest?.status === "accepted"
+                  ? "bg-green-300"
+                  : existingRequest?.status === "rejected"
+                  ? "bg-danger"
+                  : "bg-primary-300"
+              }`}
+            >
+              {requestLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-white text-lg font-rubik-bold">
+                  {existingRequest
+                    ? existingRequest.status === "pending"
+                      ? "Requested"
+                      : existingRequest.status === "accepted"
+                      ? "Accepted"
+                      : "Rejected"
+                    : "Request for Booking"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
+
         </View>
       </View>
     </View>

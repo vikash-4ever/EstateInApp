@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import NotificationIcon from "@/components/NotificationIcon";
 
 export default function MyPropertiesScreen() {
   const { userProfile } = useGlobalContext();
@@ -42,7 +43,7 @@ export default function MyPropertiesScreen() {
   };
 
   return (
-    <SafeAreaView className="bg-white flex-1">
+    <SafeAreaView className="bg-white flex-1" edges={["left", "right", "bottom"]}>
       <FlatList
         data={myProperties}
         renderItem={({ item }) => {
@@ -65,7 +66,7 @@ export default function MyPropertiesScreen() {
         }
         ListHeaderComponent={
           <View className="px-5">
-            <View className="flex flex-row items-center justify-between mt-5">
+            <View className="flex flex-row items-center justify-between mt-5 px-1">
               <TouchableOpacity
                 onPress={() => router.push("/(root)/(tabs)/profile")}
                 className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
@@ -75,9 +76,7 @@ export default function MyPropertiesScreen() {
               <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
                 Your Properties
               </Text>
-              <TouchableOpacity>
-                <Image source={icons.bell} className="w-6 h-6" />
-              </TouchableOpacity>
+              <NotificationIcon/>
             </View>
             <Text className="text-xl font-rubik-bold text-black-300 mt-5">
               {myProperties.length} Properties

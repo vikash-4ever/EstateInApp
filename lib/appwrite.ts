@@ -11,6 +11,24 @@ type MessagePayload = {
   timestamp: string;
 };
 
+type Filters = {
+  mode?: string;
+  type?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minBedrooms?: number;
+  minBathrooms?: number;
+  minArea?: number;
+  maxArea?: number;
+  facilities?: string[]; // selected facilities must all be included
+  limit?: number;
+};
+
+const safeParse = (str?: string) => {
+  if (!str) return {};
+  try { return JSON.parse(str); } catch { return {}; }
+};
+
 export const config = {
     platform : 'com.vishw.estatein',
     endpoint : process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
@@ -33,8 +51,6 @@ export const client = new Client();
 client
     .setEndpoint(config.endpoint!)
     .setProject(config.projectId!)
-    .setPlatform(config.platform!)
-
 
 export const avatar = new Avatars(client);
 export const account = new Account(client);
@@ -42,7 +58,7 @@ export const databases = new Databases(client);
 export const storage = new Storage(client);
 export {ID};
 
-export async function login( ) {
+export async function login() {
     try{
         const redirectUri = Linking.createURL('/');
 
@@ -116,35 +132,55 @@ export const getCurrentUserProfile = async () => {
   }
 };
 
-export async function getLatestProperties() {
-    try{
-        const result= await databases.listDocuments(
-            config.databaseId!,
-            config.propertiesCollectionId!,
-            [Query.orderAsc('$createdAt'), Query.limit(5)]
-        )
-        return result.documents;
-    }catch(error){
-        console.error(error);
-        return [];
-    }
-};
+export async function getLatestProperties({
+  userId,
+}: {
+  userId?: string;
+}) {
+  try {
+    const propertiesPromise = databases.listDocuments(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      [Query.orderAsc('$createdAt'), Query.limit(5)]
+    );
+
+    const favoritesPromise = userId
+      ? getFavorites(userId)
+      : Promise.resolve([]);
+
+    const [propertiesResult, favorites] = await Promise.all([
+      propertiesPromise,
+      favoritesPromise,
+    ]);
+
+    const favoriteIds = new Set(favorites.map((f: any) => f.propertyId));
+
+    return propertiesResult.documents.map((doc) => ({
+      ...doc,
+      isFavorite: favoriteIds.has(doc.$id),
+    }));
+  } catch (error) {
+    console.error("Error in getLatestProperties:", error);
+    return [];
+  }
+}
 
 export async function getProperties({
   filter,
   query,
   limit = 100,
   offset = 0,
+  userId,
 }: {
   filter: string;
   query: string;
   limit?: number;
   offset?: number;
+  userId?: string;
 }) {
   try {
     const buildQuery = [Query.orderDesc('$createdAt')];
 
-    // Search query on searchable fields (not on meta.type)
     if (query) {
       buildQuery.push(
         Query.or([
@@ -157,24 +193,32 @@ export async function getProperties({
     if (limit) buildQuery.push(Query.limit(limit));
     if (offset) buildQuery.push(Query.offset(offset));
 
-    const result = await databases.listDocuments(
+    const propertiesPromise = databases.listDocuments(
       config.databaseId!,
       config.propertiesCollectionId!,
       buildQuery
     );
 
-    // Now filter by `meta.type` client-side
-    const filteredDocs = result.documents.filter((doc) => {
+    const favoritesPromise = userId ? getFavorites(userId) : Promise.resolve([]);
+
+    const [propertiesResult, favorites] = await Promise.all([
+      propertiesPromise,
+      favoritesPromise
+    ]);
+
+    const favoriteIds = new Set(favorites.map((f: any) => f.propertyId));
+
+    const filteredDocs = propertiesResult.documents.filter((doc) => {
       const meta = JSON.parse(doc.meta || '{}');
-      if (filter && filter !== 'All') {
-        return meta.type === filter;
-      }
-      return true; // no filter applied
+      return !filter || filter === 'All' || meta.type === filter;
     });
 
-    return filteredDocs;
+    return filteredDocs.map((doc) => ({
+      ...doc,
+      isFavorite: favoriteIds.has(doc.$id)
+    }));
   } catch (error) {
-    console.error('Error in getProperties:', error);
+    console.error("Error in getProperties:", error);
     return [];
   }
 }
@@ -441,10 +485,95 @@ export const sendMessage = async ({
         timestamp: new Date().toISOString(),
       }
     );
+
+    await databases.updateDocument(
+      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.EXPO_PUBLIC_APPWRITE_CHATS_COLLECTION_ID!,
+      chatId,
+      {
+        lastMessage: content,
+        lastUpdated: new Date().toISOString(),
+      }
+    );
+
     return response;
   } catch (error) {
     console.error("Error sending message:", error);
     throw error;
+  }
+};
+
+export const deleteChatAndMessages = async (chatId: string) => {
+  try {
+    // Delete all messages in the chat
+    const messagesRes = await databases.listDocuments(
+      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.EXPO_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!,
+      [Query.equal("chatId", chatId)]
+    );
+
+    await Promise.all(
+      messagesRes.documents.map((msg) =>
+        databases.deleteDocument(
+          process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.EXPO_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!,
+          msg.$id
+        )
+      )
+    );
+
+    // Delete the chat itself
+    await databases.deleteDocument(
+      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.EXPO_PUBLIC_APPWRITE_CHATS_COLLECTION_ID!,
+      chatId
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Error deleting chat and messages:", error);
+    throw error;
+  }
+};
+
+export const deleteMessages = async (messageIds: string[]) => {
+  try {
+    await Promise.all(
+      messageIds.map((id) =>
+        databases.deleteDocument(
+          process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.EXPO_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!,
+          id
+        )
+      )
+    );
+    return true;
+  } catch (error) {
+    console.error("Error deleting messages:", error);
+    throw error;
+  }
+};
+
+export const deleteChatIfEmpty = async (chatId: string) => {
+  try {
+    // 1. Check if there are any messages left
+    const messagesRes = await databases.listDocuments(
+      process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.EXPO_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID!,
+      [Query.equal("chatId", chatId)]
+    );
+
+    // 2. If no messages, delete the chat
+    if (messagesRes.total === 0) {
+      await databases.deleteDocument(
+        process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.EXPO_PUBLIC_APPWRITE_CHATS_COLLECTION_ID!,
+        chatId
+      );
+      console.log(`Chat ${chatId} deleted because it had no messages`);
+    }
+  } catch (error) {
+    console.error("Error deleting chat if empty:", error);
   }
 };
 
@@ -464,14 +593,29 @@ export const subscribeToMessages = (
   return unsubscribe;
 };
 
-export const searchUniversal = async (query: string, mode: string = "", type: string = "") => {
+export const searchUniversal = async (query: string, filters: Filters = {}) => {
   try {
+    const {
+      mode,
+      type,
+      minPrice,
+      maxPrice,
+      minBedrooms,
+      minBathrooms,
+      minArea,
+      maxArea,
+      facilities,
+      limit = 50,
+    } = filters;
+
+    // --- Users query (unchanged) ---
     const userQuery = [
       Query.or([Query.search("name", query), Query.search("email", query)]),
-      Query.limit(5),
+      Query.limit(20),
     ];
 
-    const propertyQuery = [
+    // --- Properties: base search in indexable string fields ---
+    const propertyQuery: any[] = [
       Query.or([
         Query.search("name", query),
         Query.search("description", query),
@@ -479,20 +623,13 @@ export const searchUniversal = async (query: string, mode: string = "", type: st
         Query.search("details", query),
         Query.search("meta", query),
       ]),
-      Query.limit(5),
+      Query.limit(limit),
     ];
 
-    // Add filter for 'mode' if provided
-    if (mode) {
-      propertyQuery.push(Query.equal("mode", mode));
-    }
+    // price is top-level → safe to filter server-side
+    if (typeof minPrice === "number") propertyQuery.push(Query.greaterThanEqual("price", minPrice));
+    if (typeof maxPrice === "number") propertyQuery.push(Query.lessThanEqual("price", maxPrice));
 
-    // Add filter for 'type' if provided
-    if (type) {
-      propertyQuery.push(Query.equal("type", type));
-    }
-
-    // Fetch results from Appwrite
     const [usersRes, propsRes] = await Promise.all([
       databases.listDocuments(
         process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
@@ -506,13 +643,43 @@ export const searchUniversal = async (query: string, mode: string = "", type: st
       ),
     ]);
 
-    const users = usersRes.documents.map((doc) => ({ ...doc, type: "user" }));
-    const props = propsRes.documents.map((doc) => ({ ...doc, type: "property" }));
+    const users = usersRes.documents.map((doc: any) => ({ ...doc, type: "user" }));
 
-    // Combine user and property results
+    // --- Parse JSON and filter client-side for non-indexed attributes ---
+    let props = propsRes.documents.map((doc: any) => {
+      const details = safeParse(doc.details as string) as any;
+      const metaObj = safeParse(doc.meta as string) as any;
+
+      const parsed = {
+        mode: metaObj?.mode ?? "",
+        type: metaObj?.type ?? "",
+        facilities: Array.isArray(metaObj?.facilities) ? metaObj.facilities as string[] : [],
+        area: Number(details?.area) || 0,
+        bedrooms: Number(details?.bedrooms) || 0,
+        bathrooms: Number(details?.bathrooms) || 0,
+      };
+
+      return { ...doc, _parsed: parsed, type: "property" };
+    });
+
+    if (mode) props = props.filter((p: any) => p._parsed.mode === mode);
+    if (type) props = props.filter((p: any) => p._parsed.type === type);
+
+    if (typeof minBedrooms === "number") props = props.filter((p: any) => p._parsed.bedrooms >= minBedrooms);
+    if (typeof minBathrooms === "number") props = props.filter((p: any) => p._parsed.bathrooms >= minBathrooms);
+
+    if (typeof minArea === "number") props = props.filter((p: any) => p._parsed.area >= minArea);
+    if (typeof maxArea === "number") props = props.filter((p: any) => p._parsed.area <= maxArea);
+
+    if (facilities && facilities.length) {
+      props = props.filter((p: any) =>
+        facilities.every(f => p._parsed.facilities.includes(f))
+      );
+    }
+
     return [...users, ...props];
-  } catch (error) {
-    console.error("Universal search error", error);
+  } catch (error: any) {
+    console.error("Search Failed!", error?.message || error);
     return [];
   }
 };
@@ -581,6 +748,8 @@ export const sendBookingRequest = async ({
         senderProfile: senderProfileId,
         receiverProfile: receiverProfileId,
         status: 'pending',
+        seenByReceiver: false,
+        seenBySender: true,
         createdAt: new Date().toISOString(),
       }
     );
@@ -591,45 +760,165 @@ export const sendBookingRequest = async ({
   }
 };
 
+export const getBookingRequestForProperty = async (propertyId: string, senderProfileId: string) => {
+  try {
+    const res = await databases.listDocuments(
+      config.databaseId!,
+      config.bookingsId!,
+      [
+        Query.equal("propertyId", propertyId),
+        Query.equal("senderProfile", senderProfileId),
+      ]
+    );
+    return res.documents.length > 0 ? res.documents[0] : null;
+  } catch (err) {
+    console.error("Error checking booking request:", err);
+    return null;
+  }
+};
+
 export const getBookingRequestsForUser = async (userProfileId: string) => {
   try {
-    const response = await databases.listDocuments(
+    const res = await databases.listDocuments(
       process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.EXPO_PUBLIC_APPWRITE_BOOKINGS_COLLECTION_ID!,
       [
         Query.or([
-          Query.equal('senderProfile', userProfileId),
-          Query.equal('receiverProfile', userProfileId),
+          Query.equal("senderProfile", userProfileId),
+          Query.equal("receiverProfile", userProfileId),
         ]),
-        Query.orderDesc('createdAt'),
+        Query.orderDesc("createdAt"),
       ]
     );
-    return response.documents;
+
+    // Fetch property details for each booking
+    const bookingsWithProperty = await Promise.all(
+      res.documents.map(async (booking) => {
+        try {
+          const propertyDoc = await databases.getDocument(
+            process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
+            process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID!,
+            booking.propertyId
+          );
+          return { ...booking, property: propertyDoc };
+        } catch {
+          return { ...booking, property: null };
+        }
+      })
+    );
+
+    return bookingsWithProperty;
   } catch (error) {
-    console.error('Error fetching booking requests:', error);
+    console.error("Error fetching booking requests:", error);
+    throw error;
+  }
+};
+
+export const getFavoriteProperties = async (userId: string) => {
+  const favorites = await databases.listDocuments(
+    config.databaseId!,
+    config.favoritesCollectionId!,
+    [Query.equal("userId", userId)]
+  );
+
+  if (favorites.total === 0) return [];
+
+  const propertyIds = favorites.documents.map(f => f.propertyId);
+
+  const properties = await databases.listDocuments(
+    config.databaseId!,
+    config.propertiesCollectionId!,
+    [Query.equal("$id", propertyIds)]
+  );
+
+  return properties.documents.map(doc => ({
+    ...doc,
+    isFavorite: true
+  }));
+};
+
+export const deleteBookingRequest = async (requestId: string) => {
+  try {
+    await databases.deleteDocument(
+      config.databaseId!,
+      config.bookingsId!,
+      requestId
+    );
+    return true;
+  } catch (error) {
+    console.error("Error deleting booking request:", error);
     throw error;
   }
 };
 
 export const respondToBookingRequest = async ({
   requestId,
-  newStatus, // 'accepted' or 'declined'
+  newStatus, // 'accepted' or 'declined' (old caller)
 }: {
   requestId: string;
-  newStatus: 'accepted' | 'declined';
+  newStatus: "accepted" | "declined";
 }) => {
   try {
+    // Normalize: we only store 'accepted' | 'rejected'
+    const status = newStatus === "declined" ? "rejected" : "accepted";
+
     const response = await databases.updateDocument(
       process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.EXPO_PUBLIC_APPWRITE_BOOKINGS_COLLECTION_ID!,
       requestId,
       {
-        status: newStatus,
+        status,
+        // Whoever is responding (receiver) has seen it by performing the action,
+        // and the sender should now see a *new* unread decision.
+        seenByReceiver: true,
+        seenBySender: false,
       }
     );
     return response;
   } catch (error) {
-    console.error('Error updating booking request:', error);
+    console.error("Error updating booking request:", error);
+    throw error;
+  }
+};
+
+export const acceptBookingRequest = async (requestId: string) => {
+  try {
+    const updated = await databases.updateDocument(
+      config.databaseId!,
+      config.bookingsId!,
+      requestId,
+      {
+        status: "accepted",
+        // Receiver (owner) has seen it after taking action
+        seenByReceiver: true,
+        // Sender (requester) should now get a fresh unread notification
+        seenBySender: false
+      }
+    );
+    return updated;
+  } catch (error) {
+    console.error("Error accepting booking request:", error);
+    throw error;
+  }
+};
+
+export const rejectBookingRequest = async (requestId: string) => {
+  try {
+    const updated = await databases.updateDocument(
+      config.databaseId!,
+      config.bookingsId!,
+      requestId,
+      {
+        status: "rejected",
+        // Receiver (owner) has seen it after taking action
+        seenByReceiver: true,
+        // Sender (requester) should now get a fresh unread notification
+        seenBySender: false
+      }
+    );
+    return updated;
+  } catch (error) {
+    console.error("Error rejecting booking request:", error);
     throw error;
   }
 };

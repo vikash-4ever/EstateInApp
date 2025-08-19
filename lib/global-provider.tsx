@@ -18,6 +18,16 @@ interface GlobalContextType {
   refetch: (newParams?: Record<string, string | number>) => Promise<void>;
 }
 
+interface GlobalContextType {
+  isLoggedIn: boolean;
+  user: User | null;
+  userProfile: Models.Document | null;
+  loading: boolean;
+  refetch: (newParams?: Record<string, string | number>) => Promise<void>;
+  favoritesUpdated: boolean;
+  setFavoritesUpdated: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 
 export const GlobalProvider = ({ children }: { children: ReactNode }) => {
@@ -29,6 +39,7 @@ export const GlobalProvider = ({ children }: { children: ReactNode }) => {
 
   const [userProfile, setUserProfile] = useState<Models.Document | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [favoritesUpdated, setFavoritesUpdated] = useState(false);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -69,6 +80,8 @@ export const GlobalProvider = ({ children }: { children: ReactNode }) => {
         userProfile,
         loading: loading || profileLoading,
         refetch: refetchUser,
+        favoritesUpdated,
+        setFavoritesUpdated,
       }}
     >
       {children}

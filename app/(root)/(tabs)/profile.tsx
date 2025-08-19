@@ -6,6 +6,7 @@ import { Modal } from "react-native";
 import { router, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { View, Text, Alert, SafeAreaView, ScrollView, Image, TouchableOpacity, ImageSourcePropType } from "react-native";
+import NotificationIcon from "@/components/NotificationIcon";
 
 interface SettingsItemProps{
     icon: ImageSourcePropType;
@@ -15,13 +16,13 @@ interface SettingsItemProps{
     showArrow?: boolean;
 }
 
-const SettingsItem = ({ icon, title, onPress, textStyle, showArrow = true }: SettingsItemProps) => (
-    <TouchableOpacity onPress={onPress} className="flex flex-row items-center justify-between py-3">
-        <View className="flex flex-row items-center gap-3">
-            <Image source={icon} className="size-6"/>
+const SettingsItem = ({ icon, title, onPress, textStyle}: SettingsItemProps) => (
+    <TouchableOpacity onPress={onPress} className="flex flex-row items-center justify-between py-3 px-2">
+        <View className="flex flex-row items-center gap-5 ">
+            <Image source={icon} className="size-6 ml-3"/>
             <Text className={`text-lg font-rubik-medium text-black-300 ${textStyle}`}>{title}</Text>
         </View>
-        {showArrow && <Image source={icons.rightArrow} className="size-5"/>}
+        
     </TouchableOpacity>
 )
 
@@ -80,37 +81,41 @@ const Profile = () => {
     };
 
     return (
-        <SafeAreaView className="h-full bg-white">
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerClassName="pb-32 px-7"
-            >   
-                <View className="flex flex-row items-center justify-between mt-5">
-                    <Text className="text-xl font-rubik-bold">Profile</Text>
-                    <Image source={icons.bell} className="size-6"/>
+        <View className="flex-1 bg-white">
+            <View className="px-6">
+                <View className="flex flex-row items-center justify-between mt-7">
+                    <Text className="text-xl ml-2 font-rubik-bold">Profile</Text>
+                    <NotificationIcon/>
                 </View>
-                <View className="flex-row justify-center flex mt-5">
+                <View className="flex-row justify-center flex mt-2 pb-5 border-b border-primary-200">
                     <View className="flex flex-col items-center relative mt-5">
                         <Image source={{uri: userProfile?.avatar}} className="size-32 relative rounded-full"/>
                         <TouchableOpacity onPress={pickImage} className="absolute bottom-11 right-10">
                             <Image source={icons.edit} className="size-6" />
                         </TouchableOpacity>
-                        <Text className="text-2xl font-rubik-semibold mt-2">{userProfile?.name}</Text>
+                        <Text className="text-2xl font-rubik-semibold mt-2 color-black-200">{userProfile?.name}</Text>
                     </View>
                 </View>
+            </View> 
 
-                <View className="flex flex-col">
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerClassName="pb-32 px-6"
+            >   
+                
+
+                <View className="flex flex-col mt-5">
                     <SettingsItem icon={icons.create} title="Create" onPress={()=> router.push("/(root)/create")}/>
-                    <SettingsItem icon={icons.blackheart} title="Favourites" onPress={()=> router.push("/(root)/favorites")}/>
+                    <SettingsItem icon={icons.heart} title="Favourites" onPress={()=> router.push("/(root)/favorites")}/>
                     <SettingsItem icon={icons.send} title="Messages" onPress={()=> router.push("/(root)/chats")}/>
                     <SettingsItem icon={icons.properties} title="My Properties" onPress={()=> router.push("/(root)/properties")}/>
-                    <SettingsItem icon={icons.properties} title="Booking Requests" onPress={()=> router.push("/(root)/bookinRequests")}/>
+                    <SettingsItem icon={icons.request} title="Booking Requests" onPress={()=> router.push("/(root)/bookingRequests")}/>
                 </View>
 
                 <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
-                    <SettingsItem icon={icons.shield} title="Security" onPress={()=> router.push("/")}/>
-                    <SettingsItem icon={icons.info} title="About Us" onPress={()=> router.push("/")}/>
-                    <SettingsItem icon={icons.help} title="Help" onPress={()=> router.push("/")}/>
+                    <SettingsItem icon={icons.shield} title="Security" onPress={()=> router.push("/(root)/security")}/>
+                    <SettingsItem icon={icons.info} title="About Us" onPress={()=> router.push("/(root)/aboutUs")}/>
+                    <SettingsItem icon={icons.help} title="Help" onPress={()=> router.push("/(root)/help")}/>
                 </View>
                 <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
                     <SettingsItem icon={icons.logout} title="Logout" textStyle="text-danger" showArrow={false} onPress={handleLogout}/>
@@ -135,7 +140,7 @@ const Profile = () => {
                 </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </View>
     )
 }
 

@@ -5,9 +5,14 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/favicon.png",
-    "scheme": "estatein",
+    "scheme": "appwrite-callback-67f765230026264d970b",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "platforms": [
       "android"
     ],
@@ -16,7 +21,17 @@
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.vikash_4ever.EstateIn"
+      "package": "com.vikash_4ever.EstateIn",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAMIjVg9tH9df9nivBUkIUjKxEnNp7YQIg"
+        }
+      },
+      "androidStatusBar": {
+        "backgroundColor": "#000000",
+        "barStyle": "light-content",
+        "translucent": false
+      }
     },
     "web": {
       "bundler": "metro",

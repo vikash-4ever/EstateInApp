@@ -1,9 +1,9 @@
 import { Card } from "@/components/Cards";
 import NoResults from "@/components/NoResults";
 import icons from "@/constants/icons";
-import { getFavorites, getProperties } from "@/lib/appwrite";
+import { getFavoriteProperties, getFavorites, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,9 +14,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import NotificationIcon from "@/components/NotificationIcon";
 
 export default function FavoritesScreen() {
-  const { user } = useGlobalContext();
+  const { user, favoritesUpdated } = useGlobalContext();
   const userId = user?.$id;
   const [loading, setLoading] = useState(true);
   const [favoriteProperties, setFavoriteProperties] = useState<any[]>([]);
@@ -24,34 +26,8 @@ export default function FavoritesScreen() {
   const fetchFavorites = async () => {
     try {
       setLoading(true);
-
-      const favorites = await getFavorites(user!.$id);
-      const propertyIds = favorites.map((fav: any) => fav.propertyId);
-
-      let allProps: any[] = [];
-      let offset = 0;
-      const batchSize = 100;
-
-      while (true) {
-        const batch = await getProperties({
-          filter: "",
-          query: "",
-          limit: batchSize,
-          offset,
-        });
-
-        allProps = [...allProps, ...batch];
-
-        if (batch.length < batchSize) break;
-
-        offset += batchSize;
-      }
-
-      const favDetails = allProps.filter((prop: any) =>
-        propertyIds.includes(prop.$id)
-      );
-
-      setFavoriteProperties(favDetails);
+      const favProps = await getFavoriteProperties(user!.$id);
+      setFavoriteProperties(favProps);
     } catch (error) {
       console.error("Error loading favorite properties:", error);
     } finally {
@@ -59,26 +35,25 @@ export default function FavoritesScreen() {
     }
   };
 
-  useEffect(() => {
-    if (user?.$id) {
-      fetchFavorites();
-    }
-  }, [user]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.$id) {
+        fetchFavorites();
+      }
+    }, [user, favoritesUpdated])
+  );
 
   const handleCardPress = (id: string) => {
     router.push(`/properties/${id}`);
   };
 
   return (
-    <SafeAreaView className="bg-white flex-1">
+    <SafeAreaView className="bg-white flex-1" edges={["left", "right", "bottom"]}>
       <FlatList
         data={favoriteProperties}
-        renderItem={({ item }) => {
-          if (!userId) return null;
-          return (
-            <Card item={item} userId={userId} onPress={() => handleCardPress(item.$id)} />
-          );
-        }}
+        renderItem={({ item }) => (
+          <Card item={item} userId={userId!} onPress={() => handleCardPress(item.$id)} />
+        )}
         keyExtractor={(item) => item.$id}
         numColumns={2}
         contentContainerClassName="pb-32"
@@ -93,7 +68,7 @@ export default function FavoritesScreen() {
         }
         ListHeaderComponent={
           <View className="px-5">
-            <View className="flex flex-row items-center justify-between mt-5">
+            <View className="flex flex-row items-center justify-between mt-5 px-1">
               <TouchableOpacity
                 onPress={() => router.push('/(root)/(tabs)/profile')}
                 className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
@@ -103,9 +78,7 @@ export default function FavoritesScreen() {
               <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
                 Your Favorite Homes
               </Text>
-              <TouchableOpacity>
-                <Image source={icons.bell} className="w-6 h-6" />
-              </TouchableOpacity>
+              <NotificationIcon/>
             </View>
             <Text className="text-xl font-rubik-bold text-black-300 mt-5">
               {favoriteProperties.length} Favorites

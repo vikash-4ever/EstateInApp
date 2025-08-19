@@ -40,6 +40,7 @@ import help from "@/assets/icons/help.png";
 import dots from "@/assets/icons/dots.png";
 import trash from "@/assets/icons/trash.png";
 import properties from "@/assets/icons/properties.png";
+import request from "@/assets/icons/request.png";
 
 export default {
   google,
@@ -84,4 +85,5 @@ export default {
   dots,
   trash,
   properties,
+  request,
 };

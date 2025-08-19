@@ -20,27 +20,14 @@ const FullScreenImageViewer = ({
   swipeToCloseEnabled = true,
   doubleTapToZoomEnabled = true,
 }: FullScreenImageViewerProps) => {
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        if (visible) {
-          onClose();
-          return true;
-        }
-        return false;
-      }
-    );
-
-    return () => backHandler.remove();
-  }, [visible]);
-
+ 
   return (
     <Modal
       isVisible={visible}
       style={{ margin: 0 }}
       onBackdropPress={onClose}
       onSwipeComplete={onClose}
+      onBackButtonPress={onClose}
       swipeDirection="down"
       animationIn="fadeIn"
       animationOut="fadeOut"

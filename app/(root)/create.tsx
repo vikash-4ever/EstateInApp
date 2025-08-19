@@ -12,13 +12,16 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Picker } from "@react-native-picker/picker";
 import { router } from "expo-router";
-import MapView, { MapPressEvent, Marker } from "react-native-maps";
+import MapView, { MapPressEvent, Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
 
 import { createPost, getCurrentUserProfile } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { uploadImage } from "@/lib/uploadImage";
-import { Feather } from '@expo/vector-icons';
+import { Feather } from "@expo/vector-icons";
+import icons from "@/constants/icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import NotificationIcon from "@/components/NotificationIcon";
 
 const propertyTypes = ["House", "Apartment", "Shop", "Hall", "Room", "Plot"];
 const propertyModes = ["Rent", "Sell"];
@@ -44,6 +47,12 @@ const Create = () => {
   const [images, setImages] = useState<string[]>([]);
 
   const [location, setLocation] = useState({ latitude: 20.5937, longitude: 78.9629 });
+  const [region, setRegion] = useState<Region>({
+    latitude: 20.5937,
+    longitude: 78.9629,
+    latitudeDelta: 20,
+    longitudeDelta: 20,
+  });
 
   useEffect(() => {
     (async () => {
@@ -54,9 +63,13 @@ const Create = () => {
       }
 
       const current = await Location.getCurrentPositionAsync({});
-      setLocation({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
+      const { latitude, longitude } = current.coords;
+      setLocation({ latitude, longitude });
+      setRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
       });
     })();
   }, []);
@@ -70,14 +83,19 @@ const Create = () => {
     });
 
     if (!result.canceled) {
-      const uris = result.assets.map(asset => asset.uri);
-      setImages(prev => [...prev, ...uris]);
+      const uris = result.assets.map((asset) => asset.uri);
+      setImages((prev) => [...prev, ...uris]);
     }
   };
 
   const handleMapPress = (event: MapPressEvent) => {
     const { latitude, longitude } = event.nativeEvent.coordinate;
     setLocation({ latitude, longitude });
+    setRegion((prevRegion) => ({
+      ...prevRegion,
+      latitude,
+      longitude,
+    }));
   };
 
   const handleCreate = async () => {
@@ -91,11 +109,14 @@ const Create = () => {
 
       const profileDoc = await getCurrentUserProfile();
       if (!profileDoc) {
-        Alert.alert("Error", "User profile not found. Please complete your profile first.");
+        Alert.alert(
+          "Error",
+          "User profile not found. Please complete your profile first."
+        );
         return;
       }
 
-      const uploadedImages = await Promise.all(images.map(uri => uploadImage(uri)));
+      const uploadedImages = await Promise.all(images.map((uri) => uploadImage(uri)));
 
       const details = JSON.stringify({
         area,
@@ -135,10 +156,24 @@ const Create = () => {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <ScrollView className="px-4 py-6">
-        <Text className="text-2xl font-bold mb-4">Create Property Post</Text>
+    <SafeAreaView className="flex-1 bg-white" edges={["left", "right", "bottom"]}>
+      {/* Header */}
+      <View className="px-5">
+        <View className="flex flex-row items-center justify-between mt-5 pb-2 px-1">
+          <TouchableOpacity
+            onPress={() => router.push("/(root)/(tabs)/profile")}
+            className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
+          >
+            <Image source={icons.backArrow} className="size-5" />
+          </TouchableOpacity>
+          <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
+            Create Property
+          </Text>
+          <NotificationIcon/>
+        </View>
+      </View>
 
+      <ScrollView className="px-4 py-6">
         <Text className="mb-2 font-medium text-base">Property Name</Text>
         <TextInput
           placeholder="Property Name"
@@ -208,7 +243,11 @@ const Create = () => {
 
         <Text className="mb-2 font-medium text-base">Property Type</Text>
         <View className="border rounded mb-4">
-          <Picker selectedValue={type} onValueChange={setType}>
+          <Picker 
+            selectedValue={type} 
+            onValueChange={setType} 
+            style={{color: "black", backgroundColor: "white"}} 
+            dropdownIconColor={"black"}>
             {propertyTypes.map(item => (
               <Picker.Item label={item} value={item} key={item} />
             ))}
@@ -217,7 +256,11 @@ const Create = () => {
 
         <Text className="mb-2 font-medium text-base">Mode</Text>
         <View className="border rounded mb-4">
-          <Picker selectedValue={mode} onValueChange={setMode}>
+          <Picker 
+          selectedValue={mode} 
+          onValueChange={setMode} 
+          style={{ color: "black", backgroundColor: "white" }} 
+          dropdownIconColor={"black"}>
             {propertyModes.map(item => (
               <Picker.Item label={item} value={item} key={item} />
             ))}
@@ -256,11 +299,8 @@ const Create = () => {
         <View className="h-64 w-full rounded-xl overflow-hidden mb-6">
           <MapView
             style={{ flex: 1 }}
-            initialRegion={{
-              ...location,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
+            region={region}
+            onRegionChangeComplete={(newRegion) => setRegion(newRegion)}
             onPress={handleMapPress}
           >
             <Marker coordinate={location} />
@@ -270,9 +310,9 @@ const Create = () => {
         <Text className="mb-2 font-medium text-base">Upload Images</Text>
         <TouchableOpacity
           onPress={handlePickImages}
-          className="bg-blue-600 rounded-xl py-3 mb-4"
+          className="bg-gray-200 rounded-xl py-3 mb-4"
         >
-          <Text className="text-white text-center font-medium">Choose Images</Text>
+          <Text className="text-black text-center font-medium">Choose Images</Text>
         </TouchableOpacity>
 
         <ScrollView horizontal className="mb-6">
@@ -309,7 +349,7 @@ const Create = () => {
           <Text className="text-white mt-2 font-semibold">Creating post...</Text>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
