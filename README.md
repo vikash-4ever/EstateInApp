@@ -3,7 +3,8 @@
 A full-featured Real Estate mobile application built with **React Native**, **TypeScript**, and **Appwrite**.
 
 Users can explore properties, view detailed listings, save favorites, chat with owners, and post their own properties — all with Google authentication and real-time features.
-
+You can downloaded the app from this EAS link:
+https://expo.dev/accounts/vikash_4ever/projects/EstateIn/builds/9b554cc4-ff89-474a-9e60-ba199367e0c7
 ---
 
 ## 🔧 Tech Stack
